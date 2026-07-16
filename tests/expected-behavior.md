@@ -584,3 +584,83 @@ The first installation succeeds, the identical repeat installation succeeds with
 
 - Overwrites or appends to a different existing `AGENTS.md`.
 - Reports success after refusing a conflicting installation.
+
+## Case 30: Shared preflight rejects missing OpenAI metadata
+
+### Prompt
+
+In an isolated home where the destination does not exist, make the source `agents/openai.yaml` unavailable and run the installer with `-Target Shared`.
+
+### Expected behavior
+
+The installer returns a nonzero exit code before creating or modifying the destination and clearly identifies the missing OpenAI display metadata.
+
+### Required characteristics
+
+- Validates both source `SKILL.md` and `agents/openai.yaml` before any destination write.
+- Leaves no destination Skill directory, copied `SKILL.md`, new files, or empty `agents` directory.
+
+### Forbidden behavior
+
+- Copies `SKILL.md` before reporting the missing metadata.
+- Describes the preflight check as a complete atomic transaction or rollback system.
+
+## Case 31: Codex preflight rejects missing OpenAI metadata
+
+### Prompt
+
+In an isolated home where the destination does not exist, make the source `agents/openai.yaml` unavailable and run the installer with `-Target Codex`.
+
+### Expected behavior
+
+The installer fails before creating or modifying the shared Agent Skills destination.
+
+### Required characteristics
+
+- Returns a nonzero exit code with a clear OpenAI metadata error.
+- Leaves no partial Codex installation, copied `SKILL.md`, or empty `agents` directory.
+
+### Forbidden behavior
+
+- Creates the destination and then fails metadata validation.
+- Reports a successful or complete installation.
+
+## Case 32: Failed preflight preserves an existing installation
+
+### Prompt
+
+Create an existing isolated Shared or Codex installation, record SHA-256 hashes for its `SKILL.md` and `agents/openai.yaml`, make the source OpenAI metadata unavailable, and run the installer again.
+
+### Expected behavior
+
+Preflight validation fails before overwriting either existing destination file, and both hashes remain unchanged.
+
+### Required characteristics
+
+- Compares the destination files before and after the failed installation.
+- Preserves both the existing core Skill and existing metadata exactly.
+
+### Forbidden behavior
+
+- Partially updates `SKILL.md` before detecting the missing source metadata.
+- Deletes, truncates, or replaces the existing metadata.
+
+## Case 33: Portable targets ignore unavailable OpenAI metadata during preflight
+
+### Prompt
+
+Make the source `agents/openai.yaml` unavailable, then run isolated Gemini and Claude installations.
+
+### Expected behavior
+
+Both targets validate only the source `SKILL.md`, install successfully, and create no OpenAI metadata or empty `agents` directory.
+
+### Required characteristics
+
+- Produces only `SKILL.md` under each target's normal destination.
+- Does not attempt to validate or read `agents/openai.yaml`.
+
+### Forbidden behavior
+
+- Fails because OpenAI metadata is missing.
+- Changes the Gemini or Claude destination paths or file set.

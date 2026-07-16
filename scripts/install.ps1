@@ -86,10 +86,7 @@ function Install-SkillFiles {
         [string]$SourceOpenAIMetadata
     )
 
-    $destinationSkill = Join-Path -Path $Destination -ChildPath "SKILL.md"
-
-    New-DirectoryIfMissing -LiteralPath $Destination
-    Copy-Item -LiteralPath $SourceSkill -Destination $destinationSkill -Force -ErrorAction Stop
+    Assert-FileExists -LiteralPath $SourceSkill -Description "Canonical SKILL.md"
 
     if ($IncludeOpenAIMetadata) {
         if ([string]::IsNullOrWhiteSpace($SourceOpenAIMetadata)) {
@@ -97,7 +94,14 @@ function Install-SkillFiles {
         }
 
         Assert-FileExists -LiteralPath $SourceOpenAIMetadata -Description "OpenAI display metadata"
+    }
 
+    $destinationSkill = Join-Path -Path $Destination -ChildPath "SKILL.md"
+
+    New-DirectoryIfMissing -LiteralPath $Destination
+    Copy-Item -LiteralPath $SourceSkill -Destination $destinationSkill -Force -ErrorAction Stop
+
+    if ($IncludeOpenAIMetadata) {
         $destinationAgents = Join-Path -Path $Destination -ChildPath "agents"
         $destinationOpenAIMetadata = Join-Path -Path $destinationAgents -ChildPath "openai.yaml"
 
@@ -116,8 +120,6 @@ try {
     $sourceAdaptersDirectory = Join-Path -Path $repositoryRoot -ChildPath "adapters"
     $sourceCopilotDirectory = Join-Path -Path $sourceAdaptersDirectory -ChildPath "github-copilot"
     $sourceCopilotAdapter = Join-Path -Path $sourceCopilotDirectory -ChildPath "AGENTS.md"
-
-    Assert-FileExists -LiteralPath $sourceSkill -Description "Canonical SKILL.md"
 
     if ($Target -eq "Copilot") {
         Assert-FileExists -LiteralPath $sourceCopilotAdapter -Description "GitHub Copilot adapter"

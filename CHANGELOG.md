@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Fixed copied adapters incorrectly assuming runtime access to `../../SKILL.md`.
-- Prevented Gemini and Claude installations from receiving OpenAI-specific metadata.
-- Clarified filesystem-based Agent Skills support and installation behavior across compatible clients.
-
 ## [1.0.0] - 2026-07-16
 
 ### Added
@@ -26,3 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-agent compatibility adapters.
 - Idempotent local installation script.
 - Trigger and behavior test cases.
+
+### Fixed
+
+- Made copied Copilot and generic adapters independent of runtime access to the upstream repository.
+- Prevented Gemini and Claude installations from receiving OpenAI-specific metadata.
+- Clarified filesystem-based Skill installation behavior across compatible clients.
+- Added preflight validation to prevent predictable partial Shared or Codex installations when required OpenAI metadata is unavailable.
