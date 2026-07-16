@@ -1,0 +1,4 @@
+interface:
+  display_name: "Windows PowerShell Terminal"
+  short_description: "Generate safe native Windows PowerShell commands"
+  default_prompt: "Use $windows-powershell-terminal for this native Windows PowerShell terminal task."
