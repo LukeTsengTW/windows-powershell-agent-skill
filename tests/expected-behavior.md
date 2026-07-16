@@ -404,3 +404,183 @@ Honor each explicitly requested shell and keep examples clearly separated and la
 
 - Replaces the requested examples with PowerShell.
 - Mixes CMD, WSL, Git Bash, and PowerShell syntax inside one unlabeled block.
+
+## Case 21: Copilot adapter operates after being copied
+
+### Prompt
+
+Copy `adapters/github-copilot/AGENTS.md` into an unrelated repository and use only that copied file for a native Windows terminal task.
+
+### Expected behavior
+
+The copied adapter independently selects PowerShell, applies the essential version and safety rules, and does not require the upstream repository at runtime.
+
+### Required characteristics
+
+- Contains enough shell selection, version compatibility, exit-status, path, and safety guidance to operate independently.
+- Describes the upstream `SKILL.md` as the authoritative maintenance source.
+
+### Forbidden behavior
+
+- Fails because the upstream repository is not present.
+- Claims to contain the complete canonical rule set.
+
+## Case 22: Copilot adapter does not require a copied relative path
+
+### Prompt
+
+Install the Copilot adapter as `<ProjectPath>\AGENTS.md` where `<ProjectPath>\..\..\SKILL.md` does not exist.
+
+### Expected behavior
+
+Installation and subsequent adapter use succeed without attempting to read a relative `SKILL.md` from the target project.
+
+### Required characteristics
+
+- Treats `../../SKILL.md` only as a developer reference valid in the original repository layout.
+- States that the copied adapter is independent of that path.
+
+### Forbidden behavior
+
+- Instructs Copilot to load `<ProjectPath>\..\..\SKILL.md`.
+- Treats a missing relative file as an installation or runtime error.
+
+## Case 23: Generic system prompt operates standalone
+
+### Prompt
+
+Paste `adapters/generic/SYSTEM_PROMPT.md` into a model's system prompt without providing repository filesystem access.
+
+### Expected behavior
+
+The model can apply the minimum native Windows PowerShell shell-selection, version, path, exit-status, secret-handling, and safety rules from the pasted prompt alone.
+
+### Required characteristics
+
+- Works as a vendor-neutral prompt independent of the source repository.
+- Recommends the complete upstream Skill when the platform supports Agent Skills.
+
+### Forbidden behavior
+
+- Requires a vendor-specific tool or local repository path.
+- Claims that the compatibility layer replaces the complete canonical rules for maintenance.
+
+## Case 24: Generic prompt does not claim relative repository access
+
+### Prompt
+
+Review the generic compatibility prompt after it has been stored in an API configuration unrelated to the source repository.
+
+### Expected behavior
+
+The prompt identifies the upstream `SKILL.md` as the authoritative source without claiming that it can read the file through a relative path.
+
+### Required characteristics
+
+- Makes no runtime dependency on `../../SKILL.md`.
+- Remains understandable when copied or pasted by itself.
+
+### Forbidden behavior
+
+- Directs the model to open a relative upstream file.
+- Assumes the API host has the repository mounted.
+
+## Case 25: Gemini installs only the portable core
+
+### Prompt
+
+Run the installer with `-Target Gemini` in an isolated home directory.
+
+### Expected behavior
+
+The destination `~/.gemini/skills/windows-powershell-terminal/` contains `SKILL.md` and no OpenAI-specific metadata.
+
+### Required characteristics
+
+- Creates the necessary destination directories and copies `SKILL.md`.
+- Does not create `agents/openai.yaml` or an empty `agents` directory.
+
+### Forbidden behavior
+
+- Copies OpenAI/Codex display metadata.
+- Writes outside the isolated home directory.
+
+## Case 26: Claude installs only the portable core
+
+### Prompt
+
+Run the installer with `-Target Claude` in an isolated home directory.
+
+### Expected behavior
+
+The destination `~/.claude/skills/windows-powershell-terminal/` contains `SKILL.md` and no OpenAI-specific metadata.
+
+### Required characteristics
+
+- Creates the necessary destination directories and copies `SKILL.md`.
+- Does not create `agents/openai.yaml` or an empty `agents` directory.
+
+### Forbidden behavior
+
+- Copies OpenAI/Codex display metadata.
+- Writes outside the isolated home directory.
+
+## Case 27: Shared and Codex include OpenAI metadata
+
+### Prompt
+
+Run separate isolated installations for `-Target Shared` and `-Target Codex`.
+
+### Expected behavior
+
+Each target installs `SKILL.md` and `agents/openai.yaml` under `~/.agents/skills/windows-powershell-terminal/`.
+
+### Required characteristics
+
+- Validates the source `agents/openai.yaml` before copying it.
+- Safely updates the same installer-owned files on repeat installation.
+
+### Forbidden behavior
+
+- Omits the OpenAI/Codex display metadata.
+- Copies adapters, tests, or the entire repository into the Skill directory.
+
+## Case 28: Portable targets tolerate missing OpenAI metadata
+
+### Prompt
+
+Temporarily make the source `agents/openai.yaml` unavailable, then run isolated Gemini and Claude installations.
+
+### Expected behavior
+
+Both installations succeed because they require only the portable `SKILL.md`.
+
+### Required characteristics
+
+- Does not validate or copy OpenAI metadata for Gemini or Claude.
+- Produces only the expected portable core installation files.
+
+### Forbidden behavior
+
+- Fails Gemini or Claude installation because `agents/openai.yaml` is missing.
+- Creates an empty `agents` directory.
+
+## Case 29: Copilot installation preserves existing instructions
+
+### Prompt
+
+Install the Copilot adapter twice into an empty project, then try installing it into a project with a different existing `AGENTS.md`.
+
+### Expected behavior
+
+The first installation succeeds, the identical repeat installation succeeds without rewriting unrelated files, and the different existing file is preserved while the installer returns a clear nonzero failure.
+
+### Required characteristics
+
+- Uses content comparison to recognize the identical installed adapter.
+- Requires manual merging when an existing file differs.
+
+### Forbidden behavior
+
+- Overwrites or appends to a different existing `AGENTS.md`.
+- Reports success after refusing a conflicting installation.

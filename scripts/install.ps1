@@ -3,14 +3,18 @@
 Installs the Windows PowerShell Agent Skill from this local repository.
 
 .DESCRIPTION
-Copies the canonical SKILL.md and required agent metadata to a supported local
-skill directory, or installs the GitHub Copilot adapter into a target project.
-The operation is local, dependency-free, and safe to run repeatedly. A
-different existing AGENTS.md is never overwritten or modified automatically.
+Copies the canonical SKILL.md to a supported local skill directory. Shared and
+Codex installations also include OpenAI display metadata; Gemini and Claude
+install only the portable SKILL.md. Copilot installs its independent adapter
+into a target project. The operation is local, dependency-free, and safe to run
+repeatedly. A different existing AGENTS.md is never overwritten or modified
+automatically.
 
 .PARAMETER Target
 Selects the installation target: Shared, Codex, Gemini, Claude, or Copilot.
-Shared and Codex both use the shared Agent Skills directory.
+Shared and Codex use the shared Agent Skills directory and include OpenAI
+metadata. Gemini and Claude install only SKILL.md. Copilot uses the independent
+AGENTS.md adapter.
 
 .PARAMETER ProjectPath
 Specifies the existing project directory for the Copilot target. This parameter
@@ -76,18 +80,30 @@ function Install-SkillFiles {
         [string]$SourceSkill,
 
         [Parameter(Mandatory = $true)]
-        [string]$SourceAgentMetadata
+        [bool]$IncludeOpenAIMetadata,
+
+        [Parameter()]
+        [string]$SourceOpenAIMetadata
     )
 
-    $destinationAgents = Join-Path -Path $Destination -ChildPath "agents"
     $destinationSkill = Join-Path -Path $Destination -ChildPath "SKILL.md"
-    $destinationAgentMetadata = Join-Path -Path $destinationAgents -ChildPath "openai.yaml"
 
     New-DirectoryIfMissing -LiteralPath $Destination
-    New-DirectoryIfMissing -LiteralPath $destinationAgents
-
     Copy-Item -LiteralPath $SourceSkill -Destination $destinationSkill -Force -ErrorAction Stop
-    Copy-Item -LiteralPath $SourceAgentMetadata -Destination $destinationAgentMetadata -Force -ErrorAction Stop
+
+    if ($IncludeOpenAIMetadata) {
+        if ([string]::IsNullOrWhiteSpace($SourceOpenAIMetadata)) {
+            throw "SourceOpenAIMetadata is required when OpenAI metadata is included."
+        }
+
+        Assert-FileExists -LiteralPath $SourceOpenAIMetadata -Description "OpenAI display metadata"
+
+        $destinationAgents = Join-Path -Path $Destination -ChildPath "agents"
+        $destinationOpenAIMetadata = Join-Path -Path $destinationAgents -ChildPath "openai.yaml"
+
+        New-DirectoryIfMissing -LiteralPath $destinationAgents
+        Copy-Item -LiteralPath $SourceOpenAIMetadata -Destination $destinationOpenAIMetadata -Force -ErrorAction Stop
+    }
 
     Write-Host "Installed Windows PowerShell Agent Skill to: $Destination"
 }
@@ -134,14 +150,14 @@ try {
         }
     }
     else {
-        Assert-FileExists -LiteralPath $sourceAgentMetadata -Description "Agent display metadata"
-
         $skillFolderName = "windows-powershell-terminal"
+        $includeOpenAIMetadata = $false
 
         if (($Target -eq "Shared") -or ($Target -eq "Codex")) {
             $sharedRoot = Join-Path -Path $HOME -ChildPath ".agents"
             $sharedSkills = Join-Path -Path $sharedRoot -ChildPath "skills"
             $destination = Join-Path -Path $sharedSkills -ChildPath $skillFolderName
+            $includeOpenAIMetadata = $true
         }
         elseif ($Target -eq "Gemini") {
             $geminiRoot = Join-Path -Path $HOME -ChildPath ".gemini"
@@ -157,7 +173,7 @@ try {
             throw "Unsupported installation target: $Target"
         }
 
-        Install-SkillFiles -Destination $destination -SourceSkill $sourceSkill -SourceAgentMetadata $sourceAgentMetadata
+        Install-SkillFiles -Destination $destination -SourceSkill $sourceSkill -IncludeOpenAIMetadata $includeOpenAIMetadata -SourceOpenAIMetadata $sourceAgentMetadata
     }
 }
 catch {

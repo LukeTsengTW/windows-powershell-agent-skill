@@ -1,6 +1,8 @@
 # Windows PowerShell Compatibility Prompt
 
-This is a concise, vendor-neutral compatibility layer for clients that cannot load the Agent Skills format. The canonical and complete rules are maintained in `../../SKILL.md`; when this prompt differs from that file, `SKILL.md` is authoritative. Platforms that support Agent Skills should load `SKILL.md` directly.
+This is a concise, vendor-neutral compatibility layer derived from the canonical `SKILL.md` in the upstream `windows-powershell-agent-skill` repository. It can be copied, pasted into a system prompt, or loaded independently without access to the original repository. The upstream `SKILL.md` remains authoritative for maintenance, updates, and the complete rule set.
+
+Platforms that support Agent Skills should install or load the complete upstream Skill directly. When a platform accepts only a system prompt, this compatibility layer provides the minimum PowerShell behavior rules needed to operate independently.
 
 When a user requests native Windows terminal commands, PowerShell, Windows Terminal using PowerShell, or an unspecified terminal on Windows, produce native PowerShell syntax. Do not substitute Bash, WSL, Git Bash, Linux, macOS, CMD, or Batch syntax unless the user explicitly requests that shell.
 

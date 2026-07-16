@@ -30,7 +30,7 @@ The core guidance targets native Windows PowerShell environments:
 - PowerShell 7+, launched with `pwsh`.
 - Windows Terminal, Visual Studio Code terminals, and AI coding agent terminals when their active or requested shell is PowerShell.
 
-The repository is compatible with clients that can load Markdown instructions or an Agent Skills directory. Actual Agent Skills discovery, precedence, and activation behavior depend on each client. This project does not claim that every listed client implements the same skill-loading protocol.
+Codex, Gemini CLI, and Claude Code provide filesystem-based Skill or Agent Skills loading. Their client versions may differ in discovery paths, precedence, activation behavior, and support for additional metadata. This project does not claim that every client implements an identical Agent Skills specification.
 
 ## Repository Structure
 
@@ -71,7 +71,7 @@ After installation, restart the client or open a new agent session so the skill 
 
 ### Shared Agent Skills Directory
 
-Install to `~/.agents/skills/windows-powershell-terminal/` for clients that scan the shared Agent Skills directory:
+Install to `~/.agents/skills/windows-powershell-terminal/` for clients that scan the shared Agent Skills directory. This target installs `SKILL.md` and the OpenAI/Codex-specific `agents/openai.yaml` metadata:
 
 ```powershell
 powershell.exe -NoProfile -File ".\scripts\install.ps1" -Target Shared
@@ -85,37 +85,43 @@ pwsh -NoProfile -File ".\scripts\install.ps1" -Target Shared
 
 ### Codex
 
-The Codex target intentionally installs to the shared Agent Skills directory, `~/.agents/skills/windows-powershell-terminal/`, rather than assuming a legacy client-specific directory:
+Codex provides filesystem-based Skill loading. This target installs `SKILL.md` and `agents/openai.yaml` to the shared Agent Skills directory, `~/.agents/skills/windows-powershell-terminal/`, rather than assuming a legacy client-specific directory:
 
 ```powershell
 powershell.exe -NoProfile -File ".\scripts\install.ps1" -Target Codex
 ```
 
-Whether and when that directory is discovered depends on the installed Codex client version and configuration.
+`agents/openai.yaml` supplies OpenAI/Codex display metadata and is not part of the portable core rules. Discovery precedence and metadata behavior may vary by Codex client version. Open a new Codex session after installation so the Skill is discovered.
 
 ### Gemini CLI
 
-Install to `~/.gemini/skills/windows-powershell-terminal/`:
+Gemini CLI provides filesystem-based Agent Skills loading. The local installer copies only the portable `SKILL.md` to `~/.gemini/skills/windows-powershell-terminal/`; it does not install OpenAI-specific metadata:
 
 ```powershell
 powershell.exe -NoProfile -File ".\scripts\install.ps1" -Target Gemini
 ```
 
-Gemini CLI compatibility depends on the client's current support for loading skill-style Markdown instructions.
+Gemini CLI versions that include Skill management can also install this standalone Git repository directly:
+
+```powershell
+gemini skills install https://github.com/LukeTsengTW/windows-powershell-agent-skill.git
+```
+
+Discovery, precedence, activation consent, and management options may vary by Gemini CLI version. Open a new session after installation when the current session does not discover the new Skill.
 
 ### Claude Code
 
-Install to `~/.claude/skills/windows-powershell-terminal/`:
+Claude Code can load `SKILL.md` from a filesystem Skill directory. The installer copies only the portable `SKILL.md` to `~/.claude/skills/windows-powershell-terminal/`; it does not install OpenAI-specific metadata:
 
 ```powershell
 powershell.exe -NoProfile -File ".\scripts\install.ps1" -Target Claude
 ```
 
-Claude Code compatibility depends on the client's current skill discovery and configuration behavior.
+Skill discovery precedence and additional frontmatter behavior may vary by Claude Code version. Open a new Claude Code session after initial installation, especially when the personal skills directory did not exist when the current session started.
 
 ### GitHub Copilot
 
-GitHub Copilot uses the thin adapter rather than a skill directory. Copy `adapters/github-copilot/AGENTS.md` to the appropriate location in a target project, or manually merge its essential rules into an existing `AGENTS.md`.
+GitHub Copilot uses the thin adapter rather than a skill directory. Copy `adapters/github-copilot/AGENTS.md` to the appropriate location in a target project, or manually merge its essential rules into an existing `AGENTS.md`. The copied file is an independently usable compatibility layer and does not depend on the target project containing `../../SKILL.md`; the upstream repository's `SKILL.md` remains authoritative for the complete rules and future updates.
 
 For a project that does not already contain `AGENTS.md`:
 
@@ -127,7 +133,7 @@ The installer refuses to overwrite a different existing `AGENTS.md`. Manual merg
 
 ### Generic Agents
 
-For a client that accepts a system prompt but does not load Agent Skills, use `adapters/generic/SYSTEM_PROMPT.md` as a compact compatibility layer. If the client can load Agent Skills, load `SKILL.md` directly instead.
+For a client that accepts a system prompt but does not load Agent Skills, copy or paste `adapters/generic/SYSTEM_PROMPT.md` as an independent compatibility layer. It does not require access to the original repository. If the client can load Agent Skills, prefer installing or loading the complete `SKILL.md` instead.
 
 ## Usage Examples
 
