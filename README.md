@@ -6,6 +6,24 @@ A portable Agent Skill for generating, reviewing, converting, and executing safe
 
 This repository provides behavioral instructions for AI agents. It is not a PowerShell module, a Windows Terminal theme, or a PowerShell profile. `SKILL.md` is the canonical and complete source of the core rules. Files under `agents/` and `adapters/` provide only platform-specific metadata or thin compatibility layers.
 
+## Quick Start
+
+The fastest way to install this Skill is through the Skills CLI:
+
+```powershell
+npx skills add LukeTsengTW/windows-powershell-agent-skill
+```
+
+Run the command in Windows Terminal, Windows PowerShell, or PowerShell 7. Node.js must be installed, and `npx` must be available:
+
+```powershell
+npx --version
+```
+
+Follow the interactive prompts to select the target AI agent or installation scope. Availability and behavior may vary by client version. After installation, restart the client or open a new agent session so the Skill can be discovered.
+
+For platform-specific paths and the local PowerShell installer, see [Installation](#installation).
+
 ## Why This Skill Exists
 
 Terminal advice often assumes Bash even when a task targets native Windows. That can produce invalid commands, incorrect path syntax, unsafe deletion patterns, or behavior that changes between Windows PowerShell 5.1 and PowerShell 7+. This skill gives an agent explicit rules for selecting the requested shell and producing native PowerShell without silently switching to WSL, Git Bash, CMD, or Linux syntax.
