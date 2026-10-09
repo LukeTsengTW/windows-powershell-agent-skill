@@ -6,6 +6,8 @@ A portable Agent Skill for generating, reviewing, converting, and executing safe
 
 This repository provides behavioral instructions for AI agents. It is not a PowerShell module, a Windows Terminal theme, or a PowerShell profile. `SKILL.md` is the canonical and complete source of the core rules. Files under `agents/` and `adapters/` provide only platform-specific metadata or thin compatibility layers.
 
+> Also available for free on [Agensi](https://www.agensi.io/skills/windows-powershell-terminal). This GitHub repository remains the canonical open-source project.
+
 ## Quick Start
 
 The fastest way to install this Skill is through the Skills CLI:
