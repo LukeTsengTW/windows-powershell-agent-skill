@@ -21,6 +21,14 @@ function Assert-True {
     if (-not $Condition) { throw $Message }
 }
 
+function Write-CIFailure {
+    param([string]$Message)
+    if ($env:GITHUB_ACTIONS -eq "true") {
+        $escaped = $Message.Replace("%", "%25").Replace("`r", "%0D").Replace("`n", "%0A")
+        Write-Host "::error::$escaped"
+    }
+}
+
 function Invoke-Case {
     param([string]$Name, [scriptblock]$Body)
     try {
@@ -31,6 +39,7 @@ function Invoke-Case {
     catch {
         $script:failed++
         Write-Host "FAIL: $Name -- $($_.Exception.Message)"
+        Write-CIFailure "$Name -- $($_.Exception.Message)"
     }
 }
 
@@ -197,7 +206,7 @@ try {
         Assert-True ((Get-Item -LiteralPath $adapter).LastWriteTimeUtc -eq $mtime) "Identical repeat rewrote adapter"
         [System.IO.File]::WriteAllText($adapter, "existing instructions")
         $output = Invoke-Installer $repositoryRoot $arguments 1
-        Assert-True ($output -match "Manually merge") "Missing conflict explanation"
+        Assert-True ($output -match "Manually merge") "Missing conflict explanation. Installer output: $output"
         Assert-True ([System.IO.File]::ReadAllText($adapter) -eq "existing instructions") "Existing instructions overwritten"
     }
 
@@ -255,7 +264,7 @@ try {
                     $arguments = @("-Target", "Shared", "-SkillsPath", $skills)
                 }
                 $output = Invoke-Installer $repositoryRoot $arguments 1
-                Assert-True ($output -match "symbolic link or reparse point") "Missing link explanation"
+                Assert-True ($output -match "symbolic link or reparse point") "Missing link explanation. Installer output: $output"
                 if ($linkKind -eq "skill directory" -or $linkKind -eq "dangling copilot file") {
                     Assert-True (@(Get-ChildItem -LiteralPath $external -Force).Count -eq 0) "Wrote through a link"
                 }
@@ -321,9 +330,19 @@ try {
         }
     }
 }
+catch {
+    Write-CIFailure "Test runner error: $($_.Exception.Message)"
+    throw
+}
 finally {
-    if (Test-Path -LiteralPath $testRoot) {
-        Remove-Item -LiteralPath $testRoot -Recurse -Force
+    try {
+        if (Test-Path -LiteralPath $testRoot) {
+            Remove-Item -LiteralPath $testRoot -Recurse -Force
+        }
+    }
+    catch {
+        Write-CIFailure "Test fixture cleanup failed: $($_.Exception.Message)"
+        throw
     }
 }
 
