@@ -664,3 +664,63 @@ Both targets validate only the source `SKILL.md`, install successfully, and crea
 
 - Fails because OpenAI metadata is missing.
 - Changes the Gemini or Claude destination paths or file set.
+
+## Case 34: Destination types are checked before copying
+
+### Prompt
+
+Install Copilot into a project where `AGENTS.md` is a directory. Separately, install Shared where `SKILL.md` or `agents/openai.yaml` is a directory, or `agents` is a file.
+
+### Expected behavior
+
+Each installation fails with a nonzero exit code before copying or updating any installer-owned file. Existing contents remain intact; no nested `AGENTS.md/AGENTS.md` or `SKILL.md/SKILL.md` is created. Do not describe preflight checks as a complete rollback guarantee.
+
+## Case 35: Installer-owned links are not followed
+
+### Prompt
+
+Install into a destination whose skill directory, core file, metadata file, or Copilot `AGENTS.md` is a symbolic link or reparse point, including a dangling file link.
+
+### Expected behavior
+
+Reject the destination with a clear nonzero failure before writing. Preserve the link and its target. Do not silently update the linked source checkout or create the target of a dangling link. Tests that cannot create links must report this as skipped, not passed.
+
+## Case 36: Verify effective Git ignore behavior
+
+### Prompt
+
+Before writing an API key to `.env`, verify protection when `.gitignore` lacks a trailing newline, contains a later `!.env` rule, or `.env` is already tracked.
+
+### Expected behavior
+
+Use `git check-ignore --quiet -- .env` and check its exit code. A matching text line alone does not prove protection. If an ignore-file edit is authorized, preserve encoding and existing rules, add the rule on its own line, and recheck. Do not write secrets before verification or automatically remove a tracked file from the index.
+
+## Case 37: .NET writes follow PowerShell's current location
+
+### Prompt
+
+After `Set-Location`, write `file.txt` as UTF-8 without BOM using .NET in Windows PowerShell 5.1.
+
+### Expected behavior
+
+Resolve the destination through PowerShell, for example with `$ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath`, before calling `.NET` file APIs. Write beneath the selected filesystem location. Do not assume `[System.IO.Path]::GetFullPath` or a relative `.NET` path follows `Set-Location`.
+
+## Case 38: Native argument passing depends on executable and version
+
+### Prompt
+
+Pass JSON with embedded quotes and an empty argument to an executable in Windows PowerShell 5.1 and PowerShell 7.3+, including an `npm.cmd` example.
+
+### Expected behavior
+
+Distinguish legacy handling from the modern argument-passing modes. Explain that `.cmd` still uses legacy handling under the Windows default mode. Preserve argument boundaries using the CLI's supported input mechanism; do not assume quoting a PowerShell string proves the native process received identical bytes or globally change the mode.
+
+## Case 39: Native binary output redirection is version-sensitive
+
+### Prompt
+
+Save binary stdout from a native executable using PowerShell redirection.
+
+### Expected behavior
+
+Explain that PowerShell 7.4+ preserves native stdout bytes for direct file redirection. Do not generalize this to Windows PowerShell 5.1, PowerShell object formatting, or pipelines through text cmdlets. Avoid combining stderr into the binary stream.

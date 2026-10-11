@@ -70,6 +70,7 @@ Codex, Gemini CLI, and Claude Code provide filesystem-based Skill or Agent Skill
 |-- scripts/
 |   `-- install.ps1                  # Local, dependency-free installer
 `-- tests/
+    |-- run-tests.ps1                # Automated installer and example regressions
     |-- trigger-prompts.md           # Manual activation test prompts
     `-- expected-behavior.md         # Behavior acceptance cases
 ```
@@ -79,6 +80,16 @@ Codex, Gemini CLI, and Claude Code provide filesystem-based Skill or Agent Skill
 ## Installation
 
 Run installation commands from the repository root. The installer reads only local repository files, does not download packages, does not require administrator rights, and does not change the execution policy.
+
+For Shared, Codex, Gemini, and Claude, `-SkillsPath` optionally selects a custom parent skills directory. The installer creates `windows-powershell-terminal` beneath it. This also supports isolated tests without changing `$HOME`:
+
+```powershell
+pwsh -NoProfile -File ".\scripts\install.ps1" -Target Shared -SkillsPath "C:\temp\skill-review\skills"
+```
+
+Custom paths are not automatically registered with an agent; use a directory that your client scans when installing for actual use. Omit `-SkillsPath` for the standard client-specific paths below. Copilot uses `-ProjectPath` and rejects `-SkillsPath`.
+
+Before copying, the installer checks the paths it owns for file/directory conflicts and symbolic links or reparse points. It refuses these destinations instead of nesting a file in a same-named directory or writing through a link. It preserves unrelated files, and Shared/Codex validate both destinations before updating either file. This preflight check does not provide rollback for later I/O failures or concurrent filesystem changes.
 
 If Windows has marked the downloaded script as blocked, inspect it first and then unblock only that file:
 
@@ -149,7 +160,7 @@ For a project that does not already contain `AGENTS.md`:
 powershell.exe -NoProfile -File ".\scripts\install.ps1" -Target Copilot -ProjectPath "C:\path\to\project"
 ```
 
-The installer refuses to overwrite a different existing `AGENTS.md`. Manual merging is required because the installer cannot safely infer an existing file's structure or precedence rules.
+The installer refuses to overwrite a different existing `AGENTS.md`, or to install where `AGENTS.md` is a directory or link. Manual merging is required for different existing instructions because the installer cannot safely infer their structure or precedence rules.
 
 ### Generic Agents
 
@@ -187,7 +198,16 @@ The complete safety rules are maintained only in `SKILL.md`.
 
 ## Testing
 
-This repository uses manual, client-neutral behavior tests:
+Run automated regression tests from the repository root with Git available:
+
+```powershell
+powershell.exe -NoProfile -NonInteractive -File ".\tests\run-tests.ps1"
+pwsh -NoProfile -NonInteractive -File ".\tests\run-tests.ps1"
+```
+
+The dependency-free runner checks the current runtime's parser, all five installation targets, repeat installs, source and destination preflight failures, link handling, and executable path/secret-protection examples from `SKILL.md`. It creates and removes its own temporary fixtures using `-SkillsPath`; it does not install into personal skill directories or change `$HOME`. Symbolic-link cases are reported as skipped when the host cannot create links. The GitHub Actions workflow runs this suite on Windows PowerShell 5.1 and PowerShell 7.
+
+Client activation and generated responses still require manual, client-neutral behavior tests:
 
 - `tests/trigger-prompts.md` checks activation, shell selection, version assumptions, and safety expectations.
 - `tests/expected-behavior.md` checks required and forbidden response characteristics.

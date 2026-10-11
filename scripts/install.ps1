@@ -20,6 +20,12 @@ AGENTS.md adapter.
 Specifies the existing project directory for the Copilot target. This parameter
 is required when Target is Copilot and is ignored for other targets.
 
+.PARAMETER SkillsPath
+Overrides the parent skills directory for Shared, Codex, Gemini, or Claude.
+The windows-powershell-terminal subdirectory is created beneath this path.
+Use this for custom client locations or isolated testing without changing HOME.
+It cannot be combined with the Copilot target, which uses ProjectPath.
+
 .EXAMPLE
 .\scripts\install.ps1 -Target Shared
 
@@ -37,7 +43,11 @@ param(
     [string]$Target = "Shared",
 
     [Parameter()]
-    [string]$ProjectPath
+    [string]$ProjectPath,
+
+    [Parameter()]
+    [ValidateNotNullOrEmpty()]
+    [string]$SkillsPath
 )
 
 Set-StrictMode -Version 2.0
@@ -70,6 +80,34 @@ function New-DirectoryIfMissing {
     }
 }
 
+function Assert-DestinationPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Leaf", "Container")]
+        [string]$PathType
+    )
+
+    try {
+        $item = Get-Item -LiteralPath $LiteralPath -Force -ErrorAction Stop
+    }
+    catch [System.Management.Automation.ItemNotFoundException] {
+        return
+    }
+
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Destination is a symbolic link or reparse point: $LiteralPath. Choose a regular destination instead."
+    }
+
+    $expectDirectory = $PathType -eq "Container"
+    if ($item.PSIsContainer -ne $expectDirectory) {
+        throw "Destination has the wrong path type (expected $PathType): $LiteralPath"
+    }
+}
+
 function Install-SkillFiles {
     [CmdletBinding()]
     param(
@@ -98,13 +136,21 @@ function Install-SkillFiles {
 
     $destinationSkill = Join-Path -Path $Destination -ChildPath "SKILL.md"
 
+    # Check every installer-owned destination before updating either file.
+    # This prevents predictable partial updates; it is not a rollback system.
+    Assert-DestinationPath -LiteralPath $Destination -PathType Container
+    Assert-DestinationPath -LiteralPath $destinationSkill -PathType Leaf
+    if ($IncludeOpenAIMetadata) {
+        $destinationAgents = Join-Path -Path $Destination -ChildPath "agents"
+        $destinationOpenAIMetadata = Join-Path -Path $destinationAgents -ChildPath "openai.yaml"
+        Assert-DestinationPath -LiteralPath $destinationAgents -PathType Container
+        Assert-DestinationPath -LiteralPath $destinationOpenAIMetadata -PathType Leaf
+    }
+
     New-DirectoryIfMissing -LiteralPath $Destination
     Copy-Item -LiteralPath $SourceSkill -Destination $destinationSkill -Force -ErrorAction Stop
 
     if ($IncludeOpenAIMetadata) {
-        $destinationAgents = Join-Path -Path $Destination -ChildPath "agents"
-        $destinationOpenAIMetadata = Join-Path -Path $destinationAgents -ChildPath "openai.yaml"
-
         New-DirectoryIfMissing -LiteralPath $destinationAgents
         Copy-Item -LiteralPath $SourceOpenAIMetadata -Destination $destinationOpenAIMetadata -Force -ErrorAction Stop
     }
@@ -122,6 +168,10 @@ try {
     $sourceCopilotAdapter = Join-Path -Path $sourceCopilotDirectory -ChildPath "AGENTS.md"
 
     if ($Target -eq "Copilot") {
+        if ($PSBoundParameters.ContainsKey("SkillsPath")) {
+            throw "SkillsPath cannot be used with Copilot. Use ProjectPath instead."
+        }
+
         Assert-FileExists -LiteralPath $sourceCopilotAdapter -Description "GitHub Copilot adapter"
 
         if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
@@ -134,6 +184,7 @@ try {
 
         $resolvedProjectPath = (Resolve-Path -LiteralPath $ProjectPath -ErrorAction Stop).Path
         $destinationAdapter = Join-Path -Path $resolvedProjectPath -ChildPath "AGENTS.md"
+        Assert-DestinationPath -LiteralPath $destinationAdapter -PathType Leaf
 
         if (Test-Path -LiteralPath $destinationAdapter -PathType Leaf) {
             $sourceHash = (Get-FileHash -LiteralPath $sourceCopilotAdapter -Algorithm SHA256 -ErrorAction Stop).Hash
@@ -175,10 +226,25 @@ try {
             throw "Unsupported installation target: $Target"
         }
 
+        if ($PSBoundParameters.ContainsKey("SkillsPath")) {
+            if ([string]::IsNullOrWhiteSpace($SkillsPath)) {
+                throw "SkillsPath must not be blank."
+            }
+
+            $skillsProvider = $null
+            $skillsDrive = $null
+            $resolvedSkillsPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath(
+                $SkillsPath, [ref]$skillsProvider, [ref]$skillsDrive)
+            if ($skillsProvider.Name -ne "FileSystem") {
+                throw "SkillsPath must be a filesystem path."
+            }
+            $destination = Join-Path -Path $resolvedSkillsPath -ChildPath $skillFolderName
+        }
+
         Install-SkillFiles -Destination $destination -SourceSkill $sourceSkill -IncludeOpenAIMetadata $includeOpenAIMetadata -SourceOpenAIMetadata $sourceAgentMetadata
     }
 }
 catch {
-    Write-Error -Message ("Installation failed: " + $_.Exception.Message)
+    Write-Error -Message ("Installation failed: " + $_.Exception.Message) -ErrorAction Continue
     exit 1
 }

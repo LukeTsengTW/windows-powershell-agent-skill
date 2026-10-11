@@ -56,7 +56,7 @@ Common conversions summary; use fenced examples for copyable commands:
 | `find . -name "*.js"` | `Get-ChildItem -Recurse -File -Filter "*.js"` |
 | `cp source dest` | `Copy-Item -Path "source" -Destination "dest"` |
 | `mv source dest` | `Move-Item -Path "source" -Destination "dest"` |
-| `touch file.txt` | See create-if-missing pattern below |
+| `touch file.txt` | Create if missing; update timestamps when that is intended |
 | `cat file.txt` | `Get-Content -Path "file.txt"` |
 | `ls` | `Get-ChildItem` |
 | `pwd` | `Get-Location` |
@@ -101,10 +101,10 @@ if ($exitCode -ne 0) {
 }
 ```
 
-For `touch`, keep the simple mapping when creation is intended. To create a file only when missing, prefer:
+`touch` normally also updates timestamps on existing files. If the user only wants to create a file when missing, use this narrower pattern and do not claim full `touch` equivalence:
 
 ```powershell
-if (-not (Test-Path -Path ".\.env")) {
+if (-not (Test-Path -LiteralPath ".\.env")) {
     New-Item -ItemType File -Path ".\.env" | Out-Null
 }
 ```
@@ -115,13 +115,22 @@ if (-not (Test-Path -Path ".\.env")) {
 $filePath = ".\config\.env"
 $parent = Split-Path -Parent $filePath
 
-if ($parent -and -not (Test-Path -Path $parent)) {
+if ($parent -and -not (Test-Path -LiteralPath $parent)) {
     New-Item -ItemType Directory -Path $parent | Out-Null
 }
 
-if (-not (Test-Path -Path $filePath)) {
+if (-not (Test-Path -LiteralPath $filePath)) {
     New-Item -ItemType File -Path $filePath | Out-Null
 }
+```
+
+For an existing file, update timestamps without changing its contents when requested:
+
+```powershell
+$item = Get-Item -LiteralPath ".\ready.txt" -ErrorAction Stop
+$timestamp = Get-Date
+$item.LastWriteTime = $timestamp
+$item.LastAccessTime = $timestamp
 ```
 
 If overwriting or updating timestamps is not intended, do not use destructive alternatives.
@@ -146,6 +155,8 @@ Use the call operator `&` when the executable path is quoted:
 ```
 
 Use `--%` sparingly. It is a Windows-specific fallback for difficult literal arguments to native executables, not a default solution.
+
+Argument passing is version-sensitive: Windows PowerShell 5.1 uses legacy native argument handling, which can lose empty arguments or embedded quotes. PowerShell 7.3+ introduces `$PSNativeCommandArgumentPassing`; its default is `Windows` on Windows and `Standard` elsewhere. In `Windows` mode, commands such as `cmd.exe` and `.cmd`/`.bat` files still use legacy handling. Check the actual executable and mode before claiming that a JSON string or empty argument survives unchanged. Do not globally change this preference as a quoting workaround; prefer the CLI's supported file or standard-input option for complex payloads. See Microsoft's [native argument passing documentation](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_parsing#passing-arguments-to-native-commands).
 
 Prefer single quotes for literal strings that should not expand variables. Use double quotes when variable expansion is intended. For JSON or multi-line text, prefer here-strings:
 
@@ -247,6 +258,7 @@ Encoding rules:
 - Windows PowerShell 5.1: `Set-Content` and `Add-Content` create new or empty files using the system ANSI code page unless `-Encoding` is supplied; `Add-Content` detects and matches an existing BOM when present.
 - Windows PowerShell 5.1: `Out-File -Append` and `>>` do not reliably preserve existing file encoding.
 - PowerShell 6+: UTF-8 without BOM is the default for text output.
+- PowerShell 7.4+: redirecting a native executable's stdout directly to a file with `>` preserves its bytes. This differs from formatting PowerShell objects as text; do not assume every redirected native stream is UTF-8 text or safely round-trip binary data through text cmdlets.
 - For BOM-sensitive files in Windows PowerShell 5.1, use the .NET `UTF8Encoding($false)` pattern.
 
 For logs or BOM-tolerant files, prefer explicit encoding. These simple examples are acceptable when BOM is not a problem:
@@ -261,12 +273,13 @@ For BOM-sensitive files in Windows PowerShell 5.1, use a .NET UTF-8 without BOM 
 
 ```powershell
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-$path = [System.IO.Path]::GetFullPath(".\file.txt")
+$path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath(".\file.txt")
 [System.IO.File]::WriteAllText($path, "text", $utf8NoBom)
 ```
 
 This writes or replaces the whole file.
 Use only after confirming replacement is intended.
+Resolve relative paths through PowerShell before passing them to .NET file APIs. `[System.IO.Path]::GetFullPath()` and relative .NET file paths use the process working directory, which can differ from `Get-Location` after `Set-Location`. Use a filesystem location for the pattern above.
 
 Use `Tee-Object` when the user wants to display output and save it at the same time:
 
@@ -295,22 +308,22 @@ Use the call operator `&` for quoted script or executable paths:
 & "C:\Program Files\nodejs\npm.cmd" install
 ```
 
-If script execution is blocked, avoid global policy changes by default. Prefer process-scoped bypass:
+If script execution is blocked, inspect the script and effective policies before choosing a remedy:
 
 ```powershell
 Get-Item -LiteralPath ".\script.ps1" | Format-List FullName,Length,LastWriteTime
+Get-Content -LiteralPath ".\script.ps1"
 Get-AuthenticodeSignature -LiteralPath ".\script.ps1"
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-.\script.ps1
+Get-ExecutionPolicy -List
 ```
 
-Continue only if the script source is trusted. Or inspect and unblock the specific file:
+For a trusted downloaded file, remove its downloaded-file block when appropriate:
 
 ```powershell
-Get-Item -LiteralPath ".\script.ps1" | Format-List FullName,Length,LastWriteTime
-Get-AuthenticodeSignature -LiteralPath ".\script.ps1"
 Unblock-File -LiteralPath ".\script.ps1"
 ```
+
+If the effective policy still prevents an authorized script from running, explain the cause and use a process-scoped policy change only when justified. Do not make `Bypass` the default remedy, change machine-wide policy, or attempt to override organizational Group Policy. `Unblock-File` does not bypass `Restricted` or signature requirements under `AllSigned`.
 
 ## Path Rules
 
@@ -366,19 +379,16 @@ Set a variable for the current session only:
 $env:VAR = "value"
 ```
 
-Do not print, commit, or write API keys, tokens, or passwords into tracked files. When suggesting `.env`, ensure `.env` is ignored by Git when appropriate:
+Do not print, commit, or write API keys, tokens, or passwords into tracked files. Before writing secrets to a local `.env`, verify Git's effective ignore result from the intended repository:
 
 ```powershell
-if (-not (Test-Path -LiteralPath ".\.gitignore")) {
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText([System.IO.Path]::GetFullPath(".\.gitignore"), "", $utf8NoBom)
-}
-
-if (-not (Select-String -LiteralPath ".\.gitignore" -Pattern '^\s*\.env\s*$' -Quiet)) {
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::AppendAllText([System.IO.Path]::GetFullPath(".\.gitignore"), ".env`r`n", $utf8NoBom)
+git check-ignore --quiet -- .env
+if ($LASTEXITCODE -ne 0) {
+    throw "Git did not confirm that .env is ignored. Resolve this before writing secrets."
 }
 ```
+
+An `.env` line found by text search is not sufficient: a later negation or a more specific ignore file can override it, and ignore rules do not protect an already tracked file. Use `git ls-files --error-unmatch -- .env` to diagnose tracking (exit 0 means tracked). If updating `.gitignore` is authorized, preserve its encoding and existing rules, put the new rule on its own line even when the file lacks a trailing newline, then rerun `git check-ignore`. Do not automatically remove files from Git's index; explain tracked-secret exposure and any needed credential rotation separately.
 
 Set a persistent user-level variable only when the user explicitly asks for persistence. New terminals are usually required:
 
@@ -516,7 +526,7 @@ cat .env
 Correct PowerShell:
 
 ```powershell
-if (-not (Test-Path -Path ".\.env")) {
+if (-not (Test-Path -LiteralPath ".\.env")) {
     New-Item -ItemType File -Path ".\.env" | Out-Null
 }
 
